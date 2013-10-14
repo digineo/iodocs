@@ -140,13 +140,13 @@ function oauth(req, res, next) {
         var apiKey = req.body.apiKey || req.body.key,
             apiSecret = req.body.apiSecret || req.body.secret,
             refererURL = url.parse(req.headers.referer),
-            callbackURL = refererURL.protocol + '//' + refererURL.host + '/authSuccess/' + apiName,
+            redirectURL = refererURL.protocol + '//' + refererURL.host + '/authSuccess/' + apiName,
             oa = new OAuth(apiConfig.oauth.requestURL,
                            apiConfig.oauth.accessURL,
                            apiKey,
                            apiSecret,
                            apiConfig.oauth.version,
-                           callbackURL,
+                           redirectURL,
                            apiConfig.oauth.crypt);
 
         if (config.debug) {
@@ -210,7 +210,7 @@ function oauth2(req, res, next){
         var apiKey = req.body.apiKey || req.body.key,
             apiSecret = req.body.apiSecret || req.body.secret; 
             refererURL = url.parse(req.headers.referer),
-            callbackURL = refererURL.protocol + '//' + refererURL.host + '/oauth2Success/' + apiName,
+            redirectURL = refererURL.protocol + '//' + refererURL.host + '/oauth2Success/' + apiName,
             key = req.sessionID + ':' + apiName,
             oa = new OAuth2(apiKey,
                            apiSecret,
@@ -231,31 +231,31 @@ function oauth2(req, res, next){
         };
 
         if (apiConfig.oauth2.type == 'authorization-code') {
-            var redirectUrl = oa.getAuthorizeUrl({redirect_uri : callbackURL, response_type : 'code'});
+            var redirectUrl = oa.getAuthorizeUrl({redirect_uri : redirectURL, response_type : 'code'});
 
             db.set(key + ':apiKey', apiKey, redis.print);
             db.set(key + ':apiSecret', apiSecret, redis.print);
-            db.set(key + ':baseURL', req.headers.referer, redis.print);
+            db.set(key + ':redirectURL', redirectURL, redis.print);
 
             // Set expiration to same as session
             db.expire(key + ':apiKey', 1209600000);
             db.expire(key + ':apiSecret', 1209600000);
-            db.expire(key + ':baseURL', 1209600000);
+            db.expire(key + ':redirectURL', 1209600000);
 
             res.send({'signin': redirectUrl});
         }
         else if (apiConfig.oauth2.type == 'implicit') {
             oa._authorizeUrl = oa._accessTokenUrl
-            var redirectUrl = oa.getAuthorizeUrl({redirect_uri : callbackURL, response_type : 'token'});
+            var redirectUrl = oa.getAuthorizeUrl({redirect_uri : redirectURL, response_type : 'token'});
 
             db.set(key + ':apiKey', apiKey, redis.print);
             db.set(key + ':apiSecret', apiSecret, redis.print);
-            db.set(key + ':baseURL', req.headers.referer, redis.print);
+            db.set(key + ':redirectURL', redirectURL, redis.print);
 
             // Set expiration to same as session
             db.expire(key + ':apiKey', 1209600000);
             db.expire(key + ':apiSecret', 1209600000);
-            db.expire(key + ':baseURL', 1209600000);
+            db.expire(key + ':redirectURL', 1209600000);
 
             res.send({'implicit': redirectUrl});
         }
@@ -271,12 +271,12 @@ function oauth2(req, res, next){
 
             db.set(key + ':apiKey', apiKey, redis.print);
             db.set(key + ':apiSecret', apiSecret, redis.print);
-            db.set(key + ':baseURL', req.headers.referer, redis.print);
+            db.set(key + ':redirectURL', redirectURL, redis.print);
 
             // Set expiration to same as session
             db.expire(key + ':apiKey', 1209600000);
             db.expire(key + ':apiSecret', 1209600000);
-            db.expire(key + ':baseURL', 1209600000);
+            db.expire(key + ':redirectURL', 1209600000);
 
             //client_credentials w/Authorization header
             oa._request(http_method, accessURL, header, 
@@ -307,7 +307,7 @@ function oauth2(req, res, next){
                         db.expire(key + ':accessToken', 1209600000);
                         db.expire(key + ':refreshToken', 1209600000);
                         
-                        res.send({'refresh': callbackURL});
+                        res.send({'refresh': redirectURL});
                     });
                 }
             })
@@ -332,7 +332,7 @@ function oauth2Success(req, res, next) {
         db.mget([
             key + ':apiKey',
             key + ':apiSecret',
-            key + ':baseURL',
+            key + ':redirectURL',
             key + ':accessToken',
             key + ':refreshToken'
         ], function(err, result) {
@@ -341,7 +341,7 @@ function oauth2Success(req, res, next) {
             }
             apiKey = result[0],
             apiSecret = result[1],
-            baseURL = result[2];
+            redirectURL = result[2];
 
             if (result[3] && apiConfig.oauth2.type == 'client_credentials') {
                 req.session[apiName] = {};
@@ -372,7 +372,7 @@ function oauth2Success(req, res, next) {
 
             if (apiConfig.oauth2.type == 'authorization-code') {
                 oa.getOAuthAccessToken(req.query.code,
-                    {grant_type : "authorization_code", redirect_uri : baseURL, client_id : apiKey, client_secret : apiSecret},
+                    {grant_type : "authorization_code", redirect_uri : redirectURL, client_id : apiKey, client_secret : apiSecret},
                     function(error, oauth2access_token, oauth2refresh_token, results){
                     if (error) {
                         res.send("Error getting OAuth access token : " + util.inspect(error) + "["+oauth2access_token+"]"+ "["+oauth2refresh_token+"]", 500);
