@@ -860,7 +860,7 @@ function processRequest(req, res, next) {
                 console.log('STATUS CODE: ' + response.statusCode);
             };
 
-            res.statusCode = response.statusCode;
+            req.statusCode = response.statusCode;
 
             var body = '';
 
@@ -966,7 +966,7 @@ app.post('/processReq', oauth, processRequest, function(req, res) {
         headers: req.resultHeaders,
         response: req.result,
         call: req.call,
-        code: req.res.statusCode
+        code: req.statusCode
     };
     res.send(result);
 });
